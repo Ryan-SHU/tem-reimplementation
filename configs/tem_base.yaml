@@ -1,0 +1,59 @@
+seed: 42
+device: "cpu"
+
+data:
+  batch_size: 8
+  sequence_length: 32
+  num_observations: 45
+  num_actions: 4
+
+model:
+  num_modules: 3
+  compressed_x_dim: 16
+
+  g_dims:
+    - 32
+    - 32
+    - 32
+
+  phase_dims:
+    - 16
+    - 16
+    - 16
+
+  sensory_filter_alphas:
+    - 0.6
+    - 0.4
+    - 0.2
+
+  sensory_scales:
+    - 1.0
+    - 1.0
+    - 1.0
+
+  attractor_iterations: 5
+  attractor_kappas:
+    - 0.8
+    - 0.8
+    - 0.8
+
+  memory_eta_gen: 0.5
+  memory_eta_inf: 0.5
+  memory_lambda_gen: 0.9
+  memory_lambda_inf: 0.9
+  memory_clip: 1.0
+
+training:
+  learning_rate: 0.0003
+  num_steps: 10000
+  grad_clip_norm: 1.0
+
+loss:
+  beta_x_p: 1.0
+  beta_x_g: 1.0
+  beta_x_gt: 1.0
+  beta_p: 1.0
+  beta_px: 1.0
+  beta_g: 1.0
+  beta_g_reg: 0.001
+  beta_p_reg: 0.001
