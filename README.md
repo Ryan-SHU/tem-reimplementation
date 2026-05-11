@@ -1,6 +1,6 @@
 # TEM Reimplementation
 
-A simple PyTorch implementation of the Tolman-Eichenbaum Machine.
+A PyTorch implementation of the Tolman-Eichenbaum Machine.
 
 ## Installation
 

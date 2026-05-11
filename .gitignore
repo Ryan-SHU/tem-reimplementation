@@ -9,4 +9,4 @@ runs/
 outputs/
 checkpoints/
 projectLog.md
-tem_reimplementation.egg-info/
+src/tem_reimplementation.egg-info/
