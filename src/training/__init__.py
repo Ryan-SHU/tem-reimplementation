@@ -1,1 +1,1 @@
-"""Training utilities for TEM."""
+"""Training utilities for TEM experiments."""

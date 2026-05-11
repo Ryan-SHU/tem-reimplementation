@@ -8,5 +8,7 @@ __pycache__/
 runs/
 outputs/
 checkpoints/
+*.pt
+*.pth
 projectLog.md
 src/tem_reimplementation.egg-info/
