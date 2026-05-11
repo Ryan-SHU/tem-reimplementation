@@ -1,7 +1,43 @@
-from __future__ import annotations
+# src/tem/losses.py
+"""
+1. x_p_logits  -> x_t cross entropy
+2. x_g_logits  -> x_t cross entropy
+3. x_gt_logits -> x_t cross entropy
+4. p     vs p_g   MSE
+5. p     vs p_x   MSE
+6. g     vs g_gen MSE
+7. g L2 regularization
+8. p L2 regularization
 
+beta_x_p   controls x_p prediction loss
+beta_x_g   controls x_g reconstruction loss
+beta_x_gt  controls x_gt transition-only prediction loss
+beta_p     controls p vs p_g consistency
+beta_px    controls p vs p_x consistency
+beta_g     controls g vs g_gen consistency
+beta_g_reg controls grid-state L2 regularization
+beta_p_reg controls place-state L2 regularization
+
+
+
+use:
+
+output = model(x, a, visited)
+
+losses = compute_tem_loss(
+    output=output,
+    target_x=x,
+    loss_config=config.loss,
+)
+
+loss = losses.total
+loss.backward()
+
+print(losses.detached())
+
+"""
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 import torch
 import torch.nn.functional as F
@@ -104,7 +140,7 @@ def compute_tem_loss(
     output: TEMSequenceOutput,
     target_x: torch.Tensor,
     loss_config: Any,
-    mask: torch.Tensor | None = None,
+    mask: Optional[torch.Tensor] = None,
 ) -> TEMLossBreakdown:
     """
     Compute the full TEM loss.
@@ -398,7 +434,7 @@ def _target_to_class_indices(
 
 
 def _prepare_mask(
-    mask: torch.Tensor | None,
+    mask: Optional[torch.Tensor],
     batch_size: int,
     sequence_length: int,
     device: torch.device,
