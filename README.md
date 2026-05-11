@@ -326,6 +326,41 @@ outputs/rectangle_debug_analysis/analysis_metadata.json
 
 ---
 
+## Plotting results
+
+After training and representation analysis, generate diagnostic plots with:
+
+```bash
+python scripts/plot_rectangle_results.py \
+  --metrics-csv runs/rectangle_debug/metrics.csv \
+  --state-g-csv outputs/rectangle_debug_analysis/state_g_means.csv \
+  --output-dir outputs/rectangle_debug_plots \
+  --height 6 \
+  --width 6 \
+  --top-k-units 6
+```
+This creates:
+```
+outputs/rectangle_debug_plots/
+├── training_losses.png
+├── latent_losses.png
+├── state_visit_counts.png
+├── module_0_rank_*_unit_*_rate_map.png
+├── module_1_rank_*_unit_*_rate_map.png
+└── plot_metadata.json
+
+```
+These plots are intended as early diagnostic figures. They should not be interpreted as a complete reproduction of the original paper's figures.
+
+The current plots help answer:
+- Does the training loss decrease?
+- Are latent consistency losses finite and stable?
+- Were all environment states sufficiently sampled?
+- Do any grid-state units show spatially structured responses?
+
+
+--
+
 ## Checkpoints and logs
 
 Training outputs are written to:
@@ -419,6 +454,19 @@ The implementation emphasizes:
 - separation between model, data, training, and analysis code
 
 Because this is a reimplementation, numerical results may differ from the original paper unless the full experimental setup, hyperparameters, environments, and analysis procedures are matched carefully.
+
+
+## Related repositories
+
+The original authors provide TensorFlow implementations here:
+
+- https://github.com/djcrw/generalising-structural-knowledge
+
+A separate PyTorch implementation also exists:
+
+- https://github.com/jbakermans/torch_tem
+
+This repository is an independent educational and research-oriented PyTorch reimplementation.
 
 ---
 

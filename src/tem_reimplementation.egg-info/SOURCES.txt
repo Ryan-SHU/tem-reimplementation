@@ -1,6 +1,0 @@
-pyproject.toml
-src/tem_reimplementation.egg-info/PKG-INFO
-src/tem_reimplementation.egg-info/SOURCES.txt
-src/tem_reimplementation.egg-info/dependency_links.txt
-src/tem_reimplementation.egg-info/requires.txt
-src/tem_reimplementation.egg-info/top_level.txt
