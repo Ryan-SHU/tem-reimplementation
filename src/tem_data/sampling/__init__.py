@@ -1,1 +1,1 @@
-"""Trajectory and behavior sampling utilities for TEM experiments."""
+"""Sampling utilities: random walks and batch generation."""
