@@ -1,40 +1,68 @@
 # TEM Reimplementation
 
-A PyTorch reimplementation of the Tolman-Eichenbaum Machine (TEM), based on:
+A research-oriented PyTorch reimplementation of the Tolman-Eichenbaum Machine (TEM), based on:
 
 > Whittington, J. C. R., Muller, T. H., Mark, S., Chen, G., Barry, C., Burgess, N., & Behrens, T. E. J. (2020).  
 > **The Tolman-Eichenbaum Machine: Unifying Space and Relational Memory through Generalization in the Hippocampal Formation.**  
 > *Cell*, 183(5), 1249–1263.e23.  
 > https://doi.org/10.1016/j.cell.2020.10.024
 
-This repository is a research-oriented implementation. The goal is not to exactly reproduce the original TensorFlow implementation line by line, but to build a readable, testable, and extensible PyTorch version of the model and its experimental pipeline.
+This repository is an independent educational and research implementation. The goal is to build a readable, testable, and extensible PyTorch codebase for studying the TEM model and eventually reproducing the major experiment groups from the original paper.
+
+This is **not** an official implementation from the original authors.
 
 ---
 
 ## Project status
 
-This project currently implements:
+This repository is under active development.
 
-- Core TEM computation flow
-- Multi-module grid/place latent states
-- Attractor memory retrieval
-- Generative and inference memory updates
-- Full sequence forward pass
-- TEM loss function
-- Rectangular random-walk environment
-- Random-walk batch generation
-- Training loop
-- Checkpointing
-- CSV logging
-- Basic representation analysis
+The current codebase contains the cleaned core implementation and experiment framework scaffold. Earlier rectangle-debug experiment scripts and generated outputs have been removed so that the repository can be extended cleanly toward the full paper reproduction.
 
-Planned extensions:
+Current implementation status:
 
-- Hexagonal environments
-- Family-tree relational environments
-- Transitive inference environments
-- More faithful reproduction of original experimental analyses
-- Visualization of learned grid-like and place-like representations
+| Component | Status |
+|---|---|
+| Core TEM forward computation | Implemented |
+| Multi-module grid/place latent states | Implemented |
+| Attractor memory retrieval | Implemented |
+| Generative and inference memory updates | Implemented |
+| TEM sequence loss | Implemented |
+| Configuration loading | Implemented |
+| Training loop | Implemented |
+| Checkpointing | Implemented |
+| CSV logging | Implemented |
+| Generic batch-provider interface | Implemented |
+| Generic discrete-environment interface | Implemented |
+| Experiment-specific data pipelines | Planned |
+| Experiment-specific training scripts | Planned |
+| Experiment-specific analysis scripts | Planned |
+| Full reproduction of paper experiments | Planned |
+
+At this stage, the repository should be understood as a **clean TEM model and experiment-framework base**, not yet as a complete reproduction of all paper figures.
+
+---
+
+## Reproduction roadmap
+
+The full reproduction is organized around four experiment groups from Whittington et al. (2020).
+
+| Experiment group | Paper result | Repository namespace | Current status |
+|---|---|---|---|
+| Experiment 1 | Structural generalization across new sensory environments | `exp1_generalization` | Planned |
+| Experiment 2 | Grid-like and place-like representations in spatial graphs | `exp2_spatial` | Planned |
+| Experiment 3 | Border cells, object-vector cells, landmark cells, and task-structure cells | `exp3_transition_statistics` | Planned |
+| Experiment 4 | Structural preservation across hippocampal remapping | `exp4_remapping` | Planned |
+
+The intended development order is:
+
+```text
+1. Build clean experiment framework
+2. Implement Experiment 1: structural generalization
+3. Implement Experiment 2: spatial representations and gridness analysis
+4. Implement Experiment 3: transition-statistics cell types
+5. Implement Experiment 4: remapping analysis
+```
 
 ---
 
@@ -42,47 +70,75 @@ Planned extensions:
 
 ```text
 tem_reimplementation/
+├── LICENSE
+├── README.md
 ├── configs/
-│   └── tem_base.yaml
+│   ├── tem_base.yaml
+│   └── experiments/
 ├── docs/
 │   ├── computation_flow.md
-│   └── data_generation_flow.md
+│   └── experiments/
 ├── scripts/
-│   ├── train_rectangle.py
-│   └── analyze_representations.py
+│   ├── exp1_generalization/
+│   ├── exp2_spatial/
+│   ├── exp3_transition_statistics/
+│   └── exp4_remapping/
 ├── src/
-│   ├── data/
-│   │   ├── __init__.py
-│   │   ├── environments.py
-│   │   ├── walks.py
-│   │   └── batches.py
 │   ├── tem/
 │   │   ├── __init__.py
 │   │   ├── config.py
 │   │   ├── losses.py
 │   │   ├── types.py
 │   │   ├── utils/
-│   │   │   └── seed.py
 │   │   └── models/
-│   │       ├── __init__.py
 │   │       ├── activations.py
-│   │       ├── tensor_ops.py
 │   │       ├── attractor.py
-│   │       └── tem.py
-│   └── training/
+│   │       ├── tem.py
+│   │       └── tensor_ops.py
+│   ├── tem_data/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── envs/
+│   │   ├── sampling/
+│   │   └── queries/
+│   ├── tem_training/
+│   │   ├── __init__.py
+│   │   ├── checkpointing.py
+│   │   ├── logging.py
+│   │   ├── trainer.py
+│   │   └── types.py
+│   ├── tem_analysis/
+│   │   └── __init__.py
+│   └── tem_experiments/
 │       ├── __init__.py
-│       ├── logging.py
-│       ├── checkpointing.py
-│       └── trainer.py
+│       ├── exp1_generalization/
+│       ├── exp2_spatial/
+│       ├── exp3_transition_statistics/
+│       └── exp4_remapping/
 └── tests/
-    ├── test_activations.py
-    ├── test_attractor.py
-    ├── test_config.py
-    ├── test_data.py
-    ├── test_losses.py
-    ├── test_tem_forward.py
-    ├── test_tensor_ops.py
-    └── test_training.py
+```
+
+The core principle is:
+
+```text
+src/tem/
+    Model, loss, config, and tensor-level TEM computation.
+
+src/tem_data/
+    Data interfaces, environments, sampling logic, and query generation.
+
+src/tem_training/
+    Generic training utilities independent of any specific experiment.
+
+src/tem_analysis/
+    Shared analysis utilities such as rate maps, gridness, remapping metrics,
+    and plotting helpers.
+
+src/tem_experiments/
+    Reusable experiment-level Python logic.
+
+scripts/
+    Command-line entry points for running specific experiments.
 ```
 
 ---
@@ -98,7 +154,7 @@ TEM is a model of structural and relational memory. It combines:
    - Uses current observations to infer latent state through memory.
 
 3. **Attractor memory**
-   - Retrieves bound place-like representations from learned associative memories.
+   - Retrieves bound place-like representations from associative memories.
 
 4. **Generative prediction**
    - Predicts sensory observations from latent memory retrieval.
@@ -106,7 +162,7 @@ TEM is a model of structural and relational memory. It combines:
 5. **Hebbian-style memory updates**
    - Updates generative and inference memories during experience.
 
-In this implementation, the model receives only:
+In this implementation, the model receives tensors of the form:
 
 ```text
 x:       [B, T, N_x]
@@ -120,67 +176,10 @@ where:
 B   = batch size
 T   = sequence length
 N_x = number of sensory observation categories
-N_a = number of action / relation categories
+N_a = number of action or relation categories
 ```
 
-The model does not directly receive environment state ids or coordinates.
-
----
-
-## Data pipeline
-
-The experimental data pipeline is intentionally separated from the TEM model.
-
-```text
-src/data/environments.py
-    Defines environment structure.
-
-src/data/walks.py
-    Samples random walks through the environment.
-
-src/data/batches.py
-    Converts integer walks into TEM-ready tensors.
-```
-
-The current implemented environment is:
-
-```text
-RectangleEnvironment
-```
-
-It defines a deterministic rectangular grid with four actions:
-
-```text
-0 = up
-1 = down
-2 = left
-3 = right
-```
-
-The data pipeline produces batches with:
-
-```python
-batch = {
-    "x": x,
-    "a": a,
-    "visited": visited,
-    "position": position,
-    "observation_id": observation_id,
-    "action_id": action_id,
-}
-```
-
-Only these fields are passed into the model:
-
-```python
-output = model(
-    x=batch["x"],
-    a=batch["a"],
-    visited=batch["visited"],
-)
-```
-
-The remaining fields are kept for analysis.
+The model does not directly receive environment state ids, graph nodes, coordinates, or task labels. Those variables belong to the data-generation and analysis layers.
 
 ---
 
@@ -192,7 +191,7 @@ The full computation flow is documented in:
 docs/computation_flow.md
 ```
 
-The implementation follows this sequence:
+At a high level, the sequence update is:
 
 ```text
 x_t
@@ -216,7 +215,7 @@ grid state + generative memory
     -> sensory prediction
 
 place representation + retrieved memory
-    -> Hebbian memory update
+    -> memory update
 ```
 
 The central implementation is:
@@ -224,6 +223,72 @@ The central implementation is:
 ```text
 src/tem/models/tem.py
 ```
+
+---
+
+## Data and experiment design
+
+The cleaned repository intentionally separates generic data interfaces from experiment-specific environments.
+
+The base environment interface is:
+
+```text
+src/tem_data/base.py
+```
+
+A discrete TEM environment should define:
+
+```text
+states:
+    hidden graph nodes or task states
+
+actions:
+    movements, relations, or task transitions
+
+transition:
+    state, action -> next state
+
+observation:
+    state -> sensory observation id
+```
+
+The TEM model itself only sees one-hot observations and one-hot actions or relations. Experiment-specific variables such as node ids, positions, object identities, lap indices, or family-tree relations should be kept outside the model and used only for data generation and analysis.
+
+---
+
+## Training interface
+
+The generic trainer depends only on a minimal batch-provider interface.
+
+A batch provider must implement:
+
+```python
+sample_batch() -> dict
+```
+
+and return at least:
+
+```python
+{
+    "x": x,              # [B, T, N_x]
+    "a": a,              # [B, T, N_a]
+    "visited": visited,  # [B, T]
+}
+```
+
+Additional fields may be included for analysis, for example:
+
+```python
+{
+    "state": state,
+    "position": position,
+    "observation_id": observation_id,
+    "action_id": action_id,
+    "query": query,
+}
+```
+
+The trainer does not need to know what these experiment-specific fields mean.
 
 ---
 
@@ -243,11 +308,18 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-Install dependencies:
+Install PyTorch for your platform first. For example, follow the official PyTorch installation selector for your operating system, Python version, and CUDA version.
+
+Then install this repository in editable mode:
 
 ```bash
-pip install torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu128
 pip install -e .
+```
+
+For development, make sure the test and utility dependencies are available:
+
+```bash
+pip install pytest tqdm pyyaml matplotlib
 ```
 
 ---
@@ -265,157 +337,158 @@ Run selected tests:
 ```bash
 pytest tests/test_tem_forward.py
 pytest tests/test_losses.py
-pytest tests/test_data.py
 pytest tests/test_training.py
 ```
 
----
-
-## Training on a rectangle environment
-
-Run a short debug training job:
-
-```bash
-python scripts/train_rectangle.py \
-  --config configs/tem_base.yaml \
-  --output-dir runs/rectangle_debug \
-  --height 6 \
-  --width 6 \
-  --steps 100 \
-  --log-every 10 \
-  --checkpoint-every 50
-```
-
-Resume from the latest checkpoint:
-
-```bash
-python scripts/train_rectangle.py \
-  --config configs/tem_base.yaml \
-  --output-dir runs/rectangle_debug \
-  --resume auto \
-  --steps 100
-```
-
-Here, `--steps 100` means continuing for 100 additional optimization steps.
+The current tests focus on the core TEM model, tensor operations, losses, attractor memory, configuration logic, and generic training loop.
 
 ---
 
-## Representation analysis
+## Running experiments
 
-After training, run:
-
-```bash
-python scripts/analyze_representations.py \
-  --config configs/tem_base.yaml \
-  --checkpoint runs/rectangle_debug/checkpoints/latest.pt \
-  --output-dir outputs/rectangle_debug_analysis \
-  --height 6 \
-  --width 6 \
-  --num-batches 20
-```
-
-This computes average grid-state representations for each environment state.
-
-Outputs:
+Experiment-specific scripts will be added under:
 
 ```text
-outputs/rectangle_debug_analysis/state_g_means.pt
-outputs/rectangle_debug_analysis/state_g_means.csv
-outputs/rectangle_debug_analysis/analysis_metadata.json
+scripts/exp1_generalization/
+scripts/exp2_spatial/
+scripts/exp3_transition_statistics/
+scripts/exp4_remapping/
 ```
 
----
+At the current cleaned stage, these directories are placeholders. They are intentionally kept separate so that each paper experiment can be implemented, tested, and reviewed independently.
 
-## Plotting results
-
-After training and representation analysis, generate diagnostic plots with:
+Future examples will follow the pattern:
 
 ```bash
-python scripts/plot_rectangle_results.py \
-  --metrics-csv runs/rectangle_debug/metrics.csv \
-  --state-g-csv outputs/rectangle_debug_analysis/state_g_means.csv \
-  --output-dir outputs/rectangle_debug_plots \
-  --height 6 \
-  --width 6 \
-  --top-k-units 6
+python scripts/exp1_generalization/<script_name>.py
+python scripts/exp2_spatial/<script_name>.py
+python scripts/exp3_transition_statistics/<script_name>.py
+python scripts/exp4_remapping/<script_name>.py
 ```
-This creates:
-```
-outputs/rectangle_debug_plots/
-├── training_losses.png
-├── latent_losses.png
-├── state_visit_counts.png
-├── module_0_rank_*_unit_*_rate_map.png
-├── module_1_rank_*_unit_*_rate_map.png
-└── plot_metadata.json
-
-```
-These plots are intended as early diagnostic figures. They should not be interpreted as a complete reproduction of the original paper's figures.
-
-The current plots help answer:
-- Does the training loss decrease?
-- Are latent consistency losses finite and stable?
-- Were all environment states sufficiently sampled?
-- Do any grid-state units show spatially structured responses?
-
-
---
-
-## Checkpoints and logs
-
-Training outputs are written to:
-
-```text
-runs/
-```
-
-A typical run directory contains:
-
-```text
-runs/rectangle_debug/
-├── metrics.csv
-├── run_metadata.json
-└── checkpoints/
-    ├── latest.pt
-    ├── step_0000050.pt
-    └── step_0000100.pt
-```
-
-Generated outputs are intentionally ignored by Git.
 
 ---
 
-## Recommended `.gitignore`
+## Development workflow
 
-```gitignore
-# Python
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+The recommended Git workflow is:
 
-# Virtual environments
-.venv/
-venv/
-env/
+```text
+main
+    Stable branch. Should pass tests.
 
-# Build artifacts
-build/
-dist/
-*.egg-info/
+refactor/*
+    Structural changes to the codebase.
 
-# Experiment outputs
+cleanup/*
+    Removal of obsolete files, generated outputs, or unused code.
+
+exp1/*
+    Structural generalization experiments.
+
+exp2/*
+    Spatial representation experiments.
+
+exp3/*
+    Transition-statistics experiments.
+
+exp4/*
+    Remapping experiments.
+
+docs/*
+    Documentation-only updates.
+
+fix/*
+    Bug fixes.
+```
+
+Recommended development sequence:
+
+```bash
+git checkout main
+git pull
+git checkout -b exp1/structural-generalization
+```
+
+After making changes:
+
+```bash
+pytest
+git status
+git add .
+git commit -m "Implement initial structural generalization environment"
+git push -u origin exp1/structural-generalization
+```
+
+Then open a pull request into `main`.
+
+---
+
+## Versioning plan
+
+Suggested milestones:
+
+```text
+v0.1-core-tem
+    Core TEM model, loss, config, and tests.
+
+v0.2-training-framework
+    Generic trainer, checkpointing, logging, and batch-provider interface.
+
+v0.3-experiment-framework
+    Clean data, analysis, and experiment namespaces.
+
+v0.4-exp1-generalization
+    Structural generalization experiments.
+
+v0.5-exp2-spatial
+    Spatial representation and gridness experiments.
+
+v0.6-exp3-transition-statistics
+    Border, object-vector, landmark, and task-structure experiments.
+
+v0.7-exp4-remapping
+    Simulated and/or neural-data remapping analysis.
+```
+
+Create a tag after stable milestones:
+
+```bash
+git tag -a v0.3-experiment-framework -m "Clean experiment framework"
+git push origin v0.3-experiment-framework
+```
+
+---
+
+## Generated files and Git hygiene
+
+Generated experiment outputs should not be committed.
+
+The repository should ignore:
+
+```text
 runs/
 outputs/
 checkpoints/
 *.pt
 *.pth
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+```
 
-# OS/editor files
-.DS_Store
-.vscode/
-.idea/
+Before committing, it is useful to check:
+
+```bash
+git status
+git ls-files | grep -E '(__pycache__|\.pyc$|runs/|outputs/|checkpoints/|\.pt$|\.pth$|\.egg-info)' || true
+```
+
+If generated files appear in Git tracking, remove them from the index:
+
+```bash
+git rm -r --cached runs outputs checkpoints
+git ls-files | grep -E '(__pycache__|\.pyc$|\.pt$|\.pth$|\.egg-info)' | xargs -r git rm -r --cached
 ```
 
 ---
@@ -439,50 +512,50 @@ If this repository is useful for your work, please cite the original TEM paper:
 
 ---
 
-## Relationship to the original work
-
-This repository is an independent PyTorch reimplementation for study and experimentation.
-
-It is based on the published TEM model and is not an official release from the original authors.
-
-The implementation emphasizes:
-
-- readability
-- explicit tensor shapes
-- modular testing
-- clear documentation
-- separation between model, data, training, and analysis code
-
-Because this is a reimplementation, numerical results may differ from the original paper unless the full experimental setup, hyperparameters, environments, and analysis procedures are matched carefully.
-
-
 ## Related repositories
 
 The original authors provide TensorFlow implementations here:
 
-- https://github.com/djcrw/generalising-structural-knowledge
+```text
+https://github.com/djcrw/generalising-structural-knowledge
+```
 
 A separate PyTorch implementation also exists:
 
-- https://github.com/jbakermans/torch_tem
+```text
+https://github.com/jbakermans/torch_tem
+```
 
-This repository is an independent educational and research-oriented PyTorch reimplementation.
+This repository is an independent PyTorch reimplementation for study, testing, and experiment reproduction.
+
+---
+
+## Relationship to the original work
+
+This repository is based on the published TEM model but is not an official release from the original authors.
+
+The implementation emphasizes:
+
+- readable PyTorch code
+- explicit tensor shapes
+- modular testing
+- separation between model, data, training, analysis, and experiment code
+- reproducible experiment scripts
+- careful distinction between implemented results and planned reproduction work
+
+Because this is a reimplementation, numerical results may differ from the original paper unless the full experimental setup, hyperparameters, environments, training protocol, and analysis procedures are matched carefully.
 
 ---
 
 ## License
 
-No license has been selected yet.
+This project is released under the MIT License.
 
-Before making this repository public, add a license file if you want others to be able to reuse, modify, or distribute the code.
+See:
 
-Common choices include:
-
-- MIT License
-- Apache License 2.0
-- BSD 3-Clause License
-
-For academic research code, MIT or BSD 3-Clause are often simple choices.
+```text
+LICENSE
+```
 
 ---
 
@@ -490,4 +563,4 @@ For academic research code, MIT or BSD 3-Clause are often simple choices.
 
 This repository is for research and educational purposes.
 
-It is not intended to be a drop-in reproduction of all experiments from the original paper at this stage.
+It is not currently a complete reproduction of all experiments or figures from Whittington et al. (2020). Experiment-specific code and analysis will be added incrementally.

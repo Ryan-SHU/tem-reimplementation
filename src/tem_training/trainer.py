@@ -7,11 +7,11 @@ import torch
 from torch import nn
 from tqdm import tqdm
 
-from tem_data.batches import RandomWalkBatcher
 from tem.config import TEMConfig
 from tem.losses import compute_tem_loss
 from tem_training.checkpointing import save_checkpoint
 from tem_training.logging import CSVLogger, format_metrics
+from tem_training.types import BatchProvider
 
 @dataclass
 class TrainResult:
@@ -43,7 +43,7 @@ class TEMTrainer:
 
     This class connects:
 
-        RandomWalkBatcher
+        BatchProvider
             -> generates x, a, visited
 
         TEM model
@@ -66,7 +66,7 @@ class TEMTrainer:
         self,
         model: nn.Module,
         config: TEMConfig,
-        batcher: RandomWalkBatcher,
+        batcher: BatchProvider,
         output_dir: str | Path,
         device: str | torch.device = "cuda"
     ) -> None:
