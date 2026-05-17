@@ -1,0 +1,38 @@
+seed: 0
+device: "auto"
+
+data:
+  batch_size: 16
+  sequence_length: 50
+  num_observations: 45
+  num_actions: 4
+
+model:
+  num_modules: 3
+  compressed_x_dim: 10
+  g_dims: [10, 10, 10]
+  phase_dims: [4, 4, 4]
+  sensory_filter_alphas: [0.3, 0.5, 0.7]
+  sensory_scales: [1.0, 0.8, 0.6]
+  attractor_iterations: 3
+  attractor_kappas: [0.8, 0.8, 0.8]
+  memory_eta_gen: 0.1
+  memory_eta_inf: 0.1
+  memory_lambda_gen: 0.9999
+  memory_lambda_inf: 0.9999
+  memory_clip: 1.0
+
+training:
+  learning_rate: 0.0002
+  num_steps: 10000
+  grad_clip_norm: 5.0
+
+loss:
+  beta_x_p: 1.0
+  beta_x_g: 1.0
+  beta_x_gt: 1.0
+  beta_p: 0.1
+  beta_px: 0.1
+  beta_g: 0.1
+  beta_g_reg: 0.01
+  beta_p_reg: 0.01

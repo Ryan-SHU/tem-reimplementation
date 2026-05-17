@@ -1,1 +1,1 @@
-"""Environment implementations for TEM experiments."""
+"""Graph environment implementations."""
