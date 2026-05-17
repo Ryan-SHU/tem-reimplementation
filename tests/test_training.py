@@ -3,8 +3,8 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
-from data.batches import RandomWalkBatcher
-from data.environments import RectangleEnvironment
+from tem_data.batches import RandomWalkBatcher
+from tem_data.environments import RectangleEnvironment
 from tem.config import (
     DataConfig,
     LossConfig,
@@ -13,8 +13,8 @@ from tem.config import (
     TrainingConfig,
 )
 from tem.models.tem import TEM
-from training.checkpointing import load_checkpoint
-from training.trainer import TEMTrainer
+from tem_training.checkpointing import load_checkpoint
+from tem_training.trainer import TEMTrainer
 
 
 def make_test_config() -> TEMConfig:

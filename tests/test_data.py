@@ -1,8 +1,8 @@
 import torch
 
-from data.batches import RandomWalkBatcher
-from data.environments import RectangleEnvironment
-from data.walks import generate_random_walk
+from tem_data.batches import RandomWalkBatcher
+from tem_data.environments import RectangleEnvironment
+from tem_data.walks import generate_random_walk
 
 
 def test_rectangle_environment_basic_properties() -> None:

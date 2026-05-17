@@ -7,11 +7,11 @@ import torch
 from torch import nn
 from tqdm import tqdm
 
-from data.batches import RandomWalkBatcher
+from tem_data.batches import RandomWalkBatcher
 from tem.config import TEMConfig
 from tem.losses import compute_tem_loss
-from training.checkpointing import save_checkpoint
-from training.logging import CSVLogger, format_metrics
+from tem_training.checkpointing import save_checkpoint
+from tem_training.logging import CSVLogger, format_metrics
 
 @dataclass
 class TrainResult:
