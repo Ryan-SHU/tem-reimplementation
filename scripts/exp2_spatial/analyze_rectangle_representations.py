@@ -17,12 +17,12 @@ from pathlib import Path
 
 import torch
 
-from data.batches import RandomWalkBatcher
-from data.environments import RectangleEnvironment
+from tem_data.batches import RandomWalkBatcher
+from tem_data.environments import RectangleEnvironment
 from tem.config import load_config
 from tem.models.tem import TEM
 from tem.utils.seed import set_seed
-from training.checkpointing import load_checkpoint
+from tem_training.checkpointing import load_checkpoint
 
 
 def parse_args() -> argparse.Namespace:

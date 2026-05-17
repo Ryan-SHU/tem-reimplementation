@@ -1,22 +1,24 @@
+from typing import Dict, Optional
+
 import torch
 
-from data.environments import RectangleEnvironment
+from tem_data.base import DiscreteEnvironment
 
 
 def generate_random_walk(
-    environment: RectangleEnvironment,
+    environment: DiscreteEnvironment,
     batch_size: int,
     sequence_length: int,
-    generator: torch.Generator | None = None,
-) -> dict[str, torch.Tensor]:
+    generator: Optional[torch.Generator] = None,
+) -> Dict[str, torch.Tensor]:
     """
-    Generate a batch of random walks in an environment.
+    Generate a batch of random walks in a discrete environment.
 
     Returned tensors:
 
         position:
             [B, T]
-            Discrete state ids.
+            Discrete hidden state ids.
 
         action:
             [B, T]
@@ -28,23 +30,18 @@ def generate_random_walk(
 
     Convention:
 
-        position[:, 0] is the randomly sampled initial state.
+        position[:, 0] is the initial state.
 
-        action[:, 0] is a dummy action set to 0.
+        action[:, 0] is a dummy action.
 
         For t >= 1:
 
-            action[:, t] is sampled from valid actions at position[:, t - 1].
+            action[:, t] is sampled at position[:, t - 1]
 
             position[:, t] = environment.next_state(
                 position[:, t - 1],
                 action[:, t],
             )
-
-    This convention matches the recurrent TEM input format:
-
-        x_t is the observation at the current state.
-        a_t is the action associated with arriving at the current state.
     """
     if batch_size <= 0:
         raise ValueError("batch_size must be positive.")

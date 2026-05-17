@@ -1,57 +1,49 @@
+from typing import Dict
+
 import torch
 import torch.nn.functional as F
 
-from data.environments import RectangleEnvironment
-from data.walks import generate_random_walk
+from tem_data.base import DiscreteEnvironment
+from tem_data.walks import generate_random_walk
 
 
 class RandomWalkBatcher:
     """
-    Turn random walks into TEM-ready training batches.
+    Convert random walks into TEM-ready training batches.
 
-    Main output format:
+    Output batch:
 
-        batch["x"]:
+        x:
             [B, T, N_x]
             One-hot sensory observations.
 
-        batch["a"]:
+        a:
             [B, T, N_a]
             One-hot actions.
 
-        batch["visited"]:
+        visited:
             [B, T]
-            Memory-update mask.
+            Memory update mask.
 
-        batch["position"]:
+        position:
             [B, T]
-            Integer environment state ids.
-            This is not passed into the model.
-            It is saved for representation analysis.
+            Hidden environment states. Analysis only.
 
-        batch["observation_id"]:
+        observation_id:
             [B, T]
-            Integer sensory observation ids.
+            Integer sensory ids. Analysis only.
 
-        batch["action_id"]:
+        action_id:
             [B, T]
-            Integer action ids.
-
-    The TEM model only needs:
-
-        x, a, visited
-
-    Analysis code can use:
-
-        position, observation_id, action_id
+            Integer action ids. Analysis only.
     """
 
     def __init__(
         self,
-        environment: RectangleEnvironment,
+        environment: DiscreteEnvironment,
         batch_size: int,
         sequence_length: int,
-        device: str | torch.device = "cpu",
+        device: str = "cpu",
         seed: int = 0,
     ) -> None:
         if batch_size <= 0:
@@ -68,10 +60,7 @@ class RandomWalkBatcher:
         self.generator = torch.Generator()
         self.generator.manual_seed(seed)
 
-    def sample(self) -> dict[str, torch.Tensor]:
-        """
-        Sample one TEM training batch.
-        """
+    def sample(self) -> Dict[str, torch.Tensor]:
         walk = generate_random_walk(
             environment=self.environment,
             batch_size=self.batch_size,
@@ -109,16 +98,5 @@ class RandomWalkBatcher:
             for key, value in batch.items()
         }
 
-    def sample_batch(self) -> dict[str, torch.Tensor]:
-        """
-        Alias for sample().
-
-        Some training code reads more naturally with:
-
-            batch = batcher.sample_batch()
-
-        while quick experiments often use:
-
-            batch = batcher.sample()
-        """
+    def sample_batch(self) -> Dict[str, torch.Tensor]:
         return self.sample()
