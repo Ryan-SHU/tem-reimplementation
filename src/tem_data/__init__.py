@@ -1,1 +1,1 @@
-"""Data generation utilities for TEM experiments."""
+"""Data interfaces and experiment-specific data utilities for TEM."""

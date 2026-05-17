@@ -3,8 +3,6 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
-from tem_data.batches import RandomWalkBatcher
-from tem_data.environments import RectangleEnvironment
 from tem.config import (
     DataConfig,
     LossConfig,
@@ -15,6 +13,64 @@ from tem.config import (
 from tem.models.tem import TEM
 from tem_training.checkpointing import load_checkpoint
 from tem_training.trainer import TEMTrainer
+
+
+class DummyBatcher:
+    """
+    Minimal synthetic batcher for testing the trainer.
+
+    This avoids coupling the generic trainer test to any experiment-specific
+    environment or random-walk implementation.
+    """
+
+    def __init__(self, config: TEMConfig, seed: int = 0) -> None:
+        self.config = config
+        self.generator = torch.Generator()
+        self.generator.manual_seed(seed)
+
+    def sample_batch(self):
+        batch_size = self.config.data.batch_size
+        sequence_length = self.config.data.sequence_length
+        num_observations = self.config.data.num_observations
+        num_actions = self.config.data.num_actions
+
+        observation_id = torch.randint(
+            low=0,
+            high=num_observations,
+            size=(batch_size, sequence_length),
+            generator=self.generator,
+        )
+
+        action_id = torch.randint(
+            low=0,
+            high=num_actions,
+            size=(batch_size, sequence_length),
+            generator=self.generator,
+        )
+
+        x = F.one_hot(
+            observation_id,
+            num_classes=num_observations,
+        ).float()
+
+        a = F.one_hot(
+            action_id,
+            num_classes=num_actions,
+        ).float()
+
+        visited = torch.ones(
+            batch_size,
+            sequence_length,
+            dtype=torch.float32,
+        )
+
+        return {
+            "x": x,
+            "a": a,
+            "visited": visited,
+            "observation_id": observation_id,
+            "action_id": action_id,
+        }
 
 
 def make_test_config() -> TEMConfig:
@@ -64,22 +120,7 @@ def test_trainer_runs_and_saves_checkpoint(tmp_path: Path) -> None:
     torch.manual_seed(0)
 
     config = make_test_config()
-
-    environment = RectangleEnvironment(
-        height=3,
-        width=3,
-        num_observations=config.data.num_observations,
-        seed=0,
-    )
-
-    batcher = RandomWalkBatcher(
-        environment=environment,
-        batch_size=config.data.batch_size,
-        sequence_length=config.data.sequence_length,
-        device="cpu",
-        seed=0,
-    )
-
+    batcher = DummyBatcher(config=config, seed=0)
     model = TEM(config)
 
     trainer = TEMTrainer(
@@ -110,22 +151,7 @@ def test_checkpoint_can_be_loaded(tmp_path: Path) -> None:
     torch.manual_seed(0)
 
     config = make_test_config()
-
-    environment = RectangleEnvironment(
-        height=3,
-        width=3,
-        num_observations=config.data.num_observations,
-        seed=0,
-    )
-
-    batcher = RandomWalkBatcher(
-        environment=environment,
-        batch_size=config.data.batch_size,
-        sequence_length=config.data.sequence_length,
-        device="cpu",
-        seed=0,
-    )
-
+    batcher = DummyBatcher(config=config, seed=0)
     model = TEM(config)
 
     trainer = TEMTrainer(
