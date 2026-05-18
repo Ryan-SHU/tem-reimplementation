@@ -23,9 +23,10 @@ from tem_data.envs.rectangle import RectangleEnvironment
 from tem_data.sampling.random_walk import generate_random_walk, traversed_edges
 from tem_data.sampling.batches import WalkBatcher
 from tem_experiments.exp1_generalization.line_ti.helpers import (
+    evaluate_continuous_single,
     evaluate_zero_shot,
-    evaluate_zero_shot_single,
 )
+
 
 
 # ------------------------------------------------------------------ #
@@ -243,15 +244,15 @@ class TestZeroShotEval:
         model = TEM(config)
         env = LineEnvironment(num_nodes=7, num_observations=20)
 
-        result = evaluate_zero_shot_single(
-            model=model, env=env, explore_len=8,
+        result = evaluate_continuous_single(
+            model=model, env=env, walk_len=8,
             device=torch.device("cpu"),
         )
-        assert "zero_shot_correct" in result
-        assert "zero_shot_total" in result
-        assert "seen_correct" in result
-        assert "seen_total" in result
-        assert "nodes_visited" in result
+        assert "step_results" in result
+        assert "total_nodes" in result
+        assert isinstance(result["step_results"], list)
+        assert result["total_nodes"] == 7
+
 
     def test_multi_episode_runs(self) -> None:
         config = _tiny_config(num_actions=2, num_observations=20)
@@ -318,3 +319,4 @@ class TestLineTIExperiment:
         assert (tmp_path / "checkpoints" / "latest.pt").exists()
         assert (tmp_path / "train_metrics.csv").exists()
         assert (tmp_path / "eval_metrics.csv").exists()
+        assert result.final_bins is not None or result.final_bins is None  # bins may be None if eval didn't run

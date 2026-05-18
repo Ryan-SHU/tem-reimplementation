@@ -1,182 +1,229 @@
 """
-Helper functions for Line TI experiment.
+Helper functions for Experiment 1A (Line TI).
 
-Contains:
-    - single-world evaluation (exploration + zero-shot query)
-    - edge-tracking utilities
-    - accuracy computation
+This file implements the correct continuous-walk evaluation protocol.
+
+Core idea
+---------
+For a fresh world:
+    1. resample sensory observations on the same graph
+    2. run one continuous walk
+    3. at each step t >= 1:
+         - use x_gt[t] as the model prediction for the current target observation
+         - classify whether the current edge was seen before
+         - classify whether the current edge is an inferable unseen link
+         - record exploration coverage before step t
+
+Raw event rows are saved and used later for offline plotting.
+
+Why x_gt?
+---------
+x_gt is the transition-only predictive branch used against the current
+observation target during training. It is the most appropriate branch for
+evaluating link inference before the current observation is incorporated.
 """
 
+import csv
+from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 import torch
 import torch.nn.functional as F
 
 from tem_data.base import GraphEnvironment
-from tem_data.sampling.random_walk import generate_random_walk, traversed_edges
+from tem_data.sampling.random_walk import generate_random_walk
 
 
-def evaluate_zero_shot_single(
+EVENT_FIELDNAMES = [
+    "checkpoint_step",
+    "episode_id",
+    "t",
+    "state_prev",
+    "action_id",
+    "state_cur",
+    "edge_seen_before_t",
+    "first_time_edge",
+    "target_seen_before_t",
+    "inferable_unseen_link",
+    "nodes_visited_count_before_t",
+    "nodes_visited_fraction_before_t",
+    "unique_edges_seen_count_before_t",
+    "pred_obs_id",
+    "true_obs_id",
+    "correct",
+]
+
+
+def evaluate_continuous_single(
     model: torch.nn.Module,
     env: GraphEnvironment,
-    explore_len: int,
+    walk_len: int,
     device: torch.device,
     generator: Optional[torch.Generator] = None,
-) -> Dict[str, float]:
+    checkpoint_step: Optional[int] = None,
+    episode_id: int = 0,
+) -> List[Dict[str, int | float]]:
     """
-    Run one evaluation episode in a *fresh* world.
+    Evaluate one continuous walk in one fresh world.
 
-    Steps:
-        1. Resample observations (new world).
-        2. Random walk of length explore_len (batch=1).
-        3. Feed exploration walk to model.
-        4. Identify un-traversed edges.
-        5. For each un-traversed edge, teleport + query.
-        6. Return accuracy dict.
-
-    Returns:
-        {
-            "zero_shot_correct": int,
-            "zero_shot_total":   int,
-            "seen_correct":      int,
-            "seen_total":        int,
-            "nodes_visited":     int,
-        }
+    Returns
+    -------
+    A list of event rows, one row per step t >= 1.
     """
     model.eval()
 
-    # 1. new world
+    # fresh world
     env.resample_observations(generator)
 
-    # 2. exploration walk  [1, T_exp]
-    walk = generate_random_walk(env, batch_size=1, seq_len=explore_len, generator=generator)
-    pos = walk["position"]  # [1, T_exp]
-    act = walk["action"]    # [1, T_exp]
-    vis = walk["visited"]   # [1, T_exp]
+    walk = generate_random_walk(
+        env=env,
+        batch_size=1,
+        seq_len=walk_len,
+        generator=generator,
+    )
+
+    pos = walk["position"]   # [1, T]
+    act = walk["action"]     # [1, T]
+    vis = walk["visited"]    # [1, T]
     obs = env.get_observation_ids(pos)
 
-    x_exp = F.one_hot(obs, env.num_observations).float().to(device)  # [1,T,Nx]
-    a_exp = F.one_hot(act, env.num_actions).float().to(device)       # [1,T,Na]
-    vis_exp = vis.to(device)                                          # [1,T]
+    x = F.one_hot(obs, env.num_observations).float().to(device)
+    a = F.one_hot(act, env.num_actions).float().to(device)
+    v = vis.to(device)
 
-    # 3. feed exploration walk
     with torch.no_grad():
-        output_exp = model(x=x_exp, a=a_exp, visited=vis_exp)
+        output = model(x=x, a=a, visited=v)
 
-    # 4. identify traversed and un-traversed edges
-    seen = traversed_edges(pos[0], act[0])
-    all_edges = env.all_valid_edges()
-    unseen = [e for e in all_edges if e not in seen]
+    pred_ids = output.x_gt[0].argmax(dim=-1).cpu()   # [T]
+    true_obs = obs[0].cpu()
+    pos_seq = pos[0].cpu()
+    act_seq = act[0].cpu()
 
-    visited_states = set(pos[0].tolist())
-    nodes_visited = len(visited_states)
+    seen_edges: Set[Tuple[int, int, int]] = set()
+    visited_states: Set[int] = set()
 
-    # 5. query each edge
-    # Strategy: build a short continuation sequence for each query edge.
-    # For edge (s, a, s'):
-    #   step 0: provide x_s with dummy action  -> model "teleports" to s
-    #   step 1: provide action a -> model predicts x from transition
-    # We collect the model prediction at step 1 and compare with true obs.
+    visited_states.add(int(pos_seq[0].item()))
 
-    zero_shot_correct = 0
-    zero_shot_total = 0
-    seen_correct = 0
-    seen_total = 0
+    rows: List[Dict[str, int | float]] = []
 
-    for (s, a_int, s_next) in all_edges:
-        # We only query edges whose *source* state was visited during exploration
-        if s not in visited_states:
-            continue
+    for t in range(1, walk_len):
+        s_prev = int(pos_seq[t - 1].item())
+        a_t = int(act_seq[t].item())
+        s_cur = int(pos_seq[t].item())
 
-        # Build a 2-step mini-sequence
-        obs_s = env.get_observation_ids(torch.tensor([s])).item()
-        obs_s_next = env.get_observation_ids(torch.tensor([s_next])).item()
+        edge = (s_prev, a_t, s_cur)
 
-        # step 0: teleport to s
-        x_query = torch.zeros(1, 2, env.num_observations, device=device)
-        a_query = torch.zeros(1, 2, env.num_actions, device=device)
-        v_query = torch.ones(1, 2, device=device)
+        edge_seen_before = edge in seen_edges
+        first_time_edge = not edge_seen_before
+        target_seen_before = s_cur in visited_states
 
-        x_query[0, 0, obs_s] = 1.0         # observation at s
-        a_query[0, 0, 0] = 1.0             # dummy action for step 0
-        x_query[0, 1, obs_s_next] = 1.0    # true obs at s' (used only for loss, not prediction)
-        a_query[0, 1, a_int] = 1.0         # the queried action
+        # This is the paper-relevant event type:
+        # the link itself is new, but the target node has already been visited
+        inferable_unseen_link = first_time_edge and target_seen_before
 
-        with torch.no_grad():
-            output_q = model(x=x_query, a=a_query, visited=v_query)
+        correct = int(pred_ids[t].item()) == int(true_obs[t].item())
 
-        # The model's generative prediction at step 1 (before seeing x)
-        # is the key. We use x_gen from the generative pathway.
-        # output_q.x_gen is [1, T, Nx] — take step 1
-        pred = output_q.x_gt[0, 1]         # [Nx]
-        pred_id = int(pred.argmax().item())
-        correct = int(pred_id == obs_s_next)
+        row = {
+            "checkpoint_step": int(checkpoint_step or -1),
+            "episode_id": int(episode_id),
+            "t": int(t),
+            "state_prev": s_prev,
+            "action_id": a_t,
+            "state_cur": s_cur,
+            "edge_seen_before_t": int(edge_seen_before),
+            "first_time_edge": int(first_time_edge),
+            "target_seen_before_t": int(target_seen_before),
+            "inferable_unseen_link": int(inferable_unseen_link),
+            "nodes_visited_count_before_t": int(len(visited_states)),
+            "nodes_visited_fraction_before_t": float(len(visited_states) / env.num_states),
+            "unique_edges_seen_count_before_t": int(len(seen_edges)),
+            "pred_obs_id": int(pred_ids[t].item()),
+            "true_obs_id": int(true_obs[t].item()),
+            "correct": int(correct),
+        }
+        rows.append(row)
 
-        edge_tuple = (s, a_int, s_next)
-        if edge_tuple in seen:
-            seen_correct += correct
-            seen_total += 1
-        else:
-            zero_shot_correct += correct
-            zero_shot_total += 1
+        # update AFTER logging the current event
+        seen_edges.add(edge)
+        visited_states.add(s_cur)
 
-    return {
-        "zero_shot_correct": zero_shot_correct,
-        "zero_shot_total": zero_shot_total,
-        "seen_correct": seen_correct,
-        "seen_total": seen_total,
-        "nodes_visited": nodes_visited,
-    }
+    return rows
 
 
-def evaluate_zero_shot(
+def collect_evaluation_events(
     model: torch.nn.Module,
     env: GraphEnvironment,
-    explore_len: int,
+    walk_len: int,
     num_episodes: int,
     device: torch.device,
     generator: Optional[torch.Generator] = None,
-) -> Dict[str, float]:
+    checkpoint_step: Optional[int] = None,
+) -> List[Dict[str, int | float]]:
     """
-    Average zero-shot evaluation over many new-world episodes.
-
-    Returns:
-        {
-            "zero_shot_accuracy": float,
-            "seen_accuracy":      float,
-            "avg_nodes_visited":  float,
-        }
+    Collect event-level evaluation rows across many fresh worlds.
     """
-    total_zs_correct = 0
-    total_zs_count = 0
-    total_seen_correct = 0
-    total_seen_count = 0
-    total_nodes = 0
+    rows: List[Dict[str, int | float]] = []
 
-    for _ in range(num_episodes):
-        result = evaluate_zero_shot_single(
-            model=model,
-            env=env,
-            explore_len=explore_len,
-            device=device,
-            generator=generator,
+    for episode_id in range(num_episodes):
+        rows.extend(
+            evaluate_continuous_single(
+                model=model,
+                env=env,
+                walk_len=walk_len,
+                device=device,
+                generator=generator,
+                checkpoint_step=checkpoint_step,
+                episode_id=episode_id,
+            )
         )
-        total_zs_correct += result["zero_shot_correct"]
-        total_zs_count += result["zero_shot_total"]
-        total_seen_correct += result["seen_correct"]
-        total_seen_count += result["seen_total"]
-        total_nodes += result["nodes_visited"]
 
-    zs_acc = total_zs_correct / max(total_zs_count, 1)
-    seen_acc = total_seen_correct / max(total_seen_count, 1)
-    avg_nodes = total_nodes / max(num_episodes, 1)
+    return rows
+
+
+def summarize_events(
+    rows: List[Dict[str, int | float]],
+) -> Dict[str, float | int]:
+    """
+    Compute checkpoint-level summary metrics from raw event rows.
+    """
+    inferable = [r for r in rows if int(r["inferable_unseen_link"]) == 1]
+    seen = [r for r in rows if int(r["edge_seen_before_t"]) == 1]
+    first_time = [r for r in rows if int(r["first_time_edge"]) == 1]
+
+    inferable_correct = sum(int(r["correct"]) for r in inferable)
+    inferable_total = len(inferable)
+
+    seen_correct = sum(int(r["correct"]) for r in seen)
+    seen_total = len(seen)
+
+    first_time_correct = sum(int(r["correct"]) for r in first_time)
+    first_time_total = len(first_time)
 
     return {
-        "zero_shot_accuracy": zs_acc,
-        "seen_accuracy": seen_acc,
-        "avg_nodes_visited": avg_nodes,
-        "zero_shot_correct": total_zs_correct,
-        "zero_shot_total": total_zs_count,
-        "seen_correct": total_seen_correct,
-        "seen_total": total_seen_count,
+        "inferable_unseen_accuracy": inferable_correct / max(inferable_total, 1),
+        "inferable_unseen_correct": inferable_correct,
+        "inferable_unseen_total": inferable_total,
+        "seen_accuracy": seen_correct / max(seen_total, 1),
+        "seen_correct": seen_correct,
+        "seen_total": seen_total,
+        "first_time_edge_accuracy": first_time_correct / max(first_time_total, 1),
+        "first_time_edge_correct": first_time_correct,
+        "first_time_edge_total": first_time_total,
     }
+
+
+def write_event_rows_csv(
+    path: Path,
+    rows: List[Dict[str, int | float]],
+) -> None:
+    """
+    Save raw event rows to CSV.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=EVENT_FIELDNAMES)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)

@@ -15,14 +15,23 @@ import torch
 
 from tem.config import load_config
 from tem.utils.seed import set_seed
-from tem_experiments.exp1_generalization.family_tree.experiment import run_family_tree
-from tem_experiments.exp1_generalization.family_tree.plotting import plot_family_tree_results
+from tem_experiments.exp1_generalization.family_tree.experiment import (
+    run_family_tree,
+)
+from tem_experiments.exp1_generalization.family_tree.plotting import (
+    plot_family_tree_results,
+)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Exp 1B: Family Tree")
-    parser.add_argument("--config", type=str, default="configs/experiments/exp1_family_tree.yaml")
-    parser.add_argument("--output-dir", type=str, default="runs/exp1_family_tree")
+    parser.add_argument(
+        "--config", type=str,
+        default="configs/experiments/exp1_family_tree.yaml",
+    )
+    parser.add_argument(
+        "--output-dir", type=str, default="runs/exp1_family_tree",
+    )
     parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--eval-every", type=int, default=500)
     parser.add_argument("--eval-episodes", type=int, default=200)
@@ -34,7 +43,11 @@ def main() -> None:
 
     config = load_config(args.config)
     set_seed(args.seed)
-    device = torch.device("cuda" if args.device == "auto" and torch.cuda.is_available() else "cpu")
+    device = torch.device(
+        "cuda"
+        if args.device == "auto" and torch.cuda.is_available()
+        else "cpu"
+    )
 
     result = run_family_tree(
         config=config,
@@ -49,7 +62,13 @@ def main() -> None:
     )
 
     plot_dir = Path(args.output_dir) / "plots"
-    plot_family_tree_results(result.history, result.eval_history, plot_dir)
+    plot_family_tree_results(
+        train_history=result.history,
+        eval_history=result.eval_history,
+        output_dir=plot_dir,
+        final_bins=result.final_bins,
+    )
+
     print(f"\nDone. Final step: {result.final_step}")
     print(f"Plots: {plot_dir}")
 

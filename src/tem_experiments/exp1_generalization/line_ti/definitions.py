@@ -3,60 +3,58 @@ Experiment 1A: Transitive Inference on a line graph.
 
 Paper reference
 ---------------
-Main text:  "TEM generalises structural knowledge …", Figure 3 A, D
-STAR Methods: "Transitive inference" paragraph
+Main text: Figure 3 A, D
+Task family: structural generalization in a new sensory environment
 
 Graph
 -----
     0 -- 1 -- 2 -- ... -- (N-1)
 
-    num_nodes  = 7   (paper default)
+    num_nodes   = 7   (paper default)
     num_actions = 2   (left=0, right=1)
 
-Dimensions
-----------
-    B       batch size
-    T       sequence length (training walk)
-    T_exp   exploration length (evaluation walk in new world)
-    N_x     number of distinct sensory observations
-    N_a     2
-    S       7
+Key idea
+--------
+Training:
+    The model is trained across many worlds that share the same graph
+    structure but differ in their sensory assignment.
 
-Training protocol
------------------
-    For each training step:
-        1. env.resample_observations()   # new world
-        2. walk = random_walk(env, B, T)
-        3. batch = one_hot(walk)
-        4. output = model(batch)
-        5. loss   = compute_tem_loss(output, batch["x"])
-        6. optimizer.step()
+Evaluation:
+    Evaluation is done offline, from saved checkpoints.
+    For each checkpoint:
+        1. create many fresh worlds
+        2. run a continuous walk in each world
+        3. at every step, record whether the current edge is:
+             - seen before
+             - unseen but inferable
+        4. save raw event-level evaluation rows
+        5. aggregate later for plotting
 
-Evaluation protocol
--------------------
-    In a new world:
-        1. env.resample_observations()
-        2. exploration walk of length T_exp
-        3. Feed walk to model (build memory)
-        4. For each *un-traversed* valid edge (s, a, s'):
-             - teleport model to state s (by feeding x_s with dummy action)
-             - apply action a
-             - check if argmax of predicted x equals observation at s'
-        5. Report zero-shot accuracy
+Paper-style plotting:
+    x-axis:
+        - number of linked observations
+        - number of nodes visited
+        - proportion of nodes visited
 
-Key metric
-----------
-    zero_shot_accuracy =
-        (# correct predictions on un-traversed edges) /
-        (# un-traversed edges queried)
+    y-axis:
+        - correct inference of link
+
+    different curves:
+        - different training quantiles
 """
 
-# Default hyper-parameters following the paper
 NUM_NODES = 7
 NUM_ACTIONS = 2
-NUM_OBSERVATIONS = 45      # paper uses N_x = 45 for TI
-TRAIN_SEQ_LEN = 30         # T during training
-EVAL_EXPLORE_LEN = 12      # T_exp: partial exploration
+NUM_OBSERVATIONS = 45
+
+TRAIN_SEQ_LEN = 30
 TRAIN_BATCH_SIZE = 16
 TRAIN_STEPS = 10000
-EVAL_EPISODES = 200        # number of new-world episodes for evaluation
+
+# evaluation uses a longer continuous walk
+EVAL_EXPLORE_LEN = 12
+EVAL_WALK_LEN = 36
+EVAL_EPISODES = 200
+
+NUM_TRAINING_QUANTILES = 5
+DEFAULT_CHECKPOINT_EVERY = 500

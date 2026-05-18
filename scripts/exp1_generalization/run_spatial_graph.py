@@ -15,14 +15,23 @@ import torch
 
 from tem.config import load_config
 from tem.utils.seed import set_seed
-from tem_experiments.exp1_generalization.spatial_graph.experiment import run_spatial_graph
-from tem_experiments.exp1_generalization.spatial_graph.plotting import plot_spatial_graph_results
+from tem_experiments.exp1_generalization.spatial_graph.experiment import (
+    run_spatial_graph,
+)
+from tem_experiments.exp1_generalization.spatial_graph.plotting import (
+    plot_spatial_graph_results,
+)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Exp 1C: Spatial Graph")
-    parser.add_argument("--config", type=str, default="configs/experiments/exp1_spatial_graph.yaml")
-    parser.add_argument("--output-dir", type=str, default="runs/exp1_spatial_graph")
+    parser.add_argument(
+        "--config", type=str,
+        default="configs/experiments/exp1_spatial_graph.yaml",
+    )
+    parser.add_argument(
+        "--output-dir", type=str, default="runs/exp1_spatial_graph",
+    )
     parser.add_argument("--height", type=int, default=6)
     parser.add_argument("--width", type=int, default=6)
     parser.add_argument("--steps", type=int, default=None)
@@ -36,7 +45,11 @@ def main() -> None:
 
     config = load_config(args.config)
     set_seed(args.seed)
-    device = torch.device("cuda" if args.device == "auto" and torch.cuda.is_available() else "cpu")
+    device = torch.device(
+        "cuda"
+        if args.device == "auto" and torch.cuda.is_available()
+        else "cpu"
+    )
 
     result = run_spatial_graph(
         config=config,
@@ -53,7 +66,13 @@ def main() -> None:
     )
 
     plot_dir = Path(args.output_dir) / "plots"
-    plot_spatial_graph_results(result.history, result.eval_history, plot_dir)
+    plot_spatial_graph_results(
+        train_history=result.history,
+        eval_history=result.eval_history,
+        output_dir=plot_dir,
+        final_bins=result.final_bins,
+    )
+
     print(f"\nDone. Final step: {result.final_step}")
     print(f"Plots: {plot_dir}")
 
