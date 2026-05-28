@@ -1,26 +1,24 @@
 """
 Helper functions for Experiment 1A (Line TI).
 
-This file implements the correct continuous-walk evaluation protocol.
+This file implements event-level continuous-walk evaluation.
 
-Core idea
----------
-For a fresh world:
+For each checkpoint and each fresh world:
     1. resample sensory observations on the same graph
-    2. run one continuous walk
-    3. at each step t >= 1:
-         - use x_gt[t] as the model prediction for the current target observation
-         - classify whether the current edge was seen before
-         - classify whether the current edge is an inferable unseen link
-         - record exploration coverage before step t
+    2. run one continuous random walk
+    3. record one event row for every transition t >= 1
 
-Raw event rows are saved and used later for offline plotting.
+The paper-style metric is:
 
-Why x_gt?
----------
-x_gt is the transition-only predictive branch used against the current
-observation target during training. It is the most appropriate branch for
-evaluating link inference before the current observation is incorporated.
+    correct inference of link
+
+Operationally, we define an inferable unseen link event as:
+
+    edge_visit_count_before_t == 0
+    and target_visit_count_before_t > 0
+
+That is, the current transition/link has not been traversed before, but the
+target node has already been observed in the current world.
 """
 
 import csv
@@ -41,6 +39,11 @@ EVENT_FIELDNAMES = [
     "state_prev",
     "action_id",
     "state_cur",
+    "source_visit_count_before_t",
+    "target_visit_count_before_t",
+    "current_target_visit_index",
+    "edge_visit_count_before_t",
+    "current_edge_visit_index",
     "edge_seen_before_t",
     "first_time_edge",
     "target_seen_before_t",
@@ -68,11 +71,10 @@ def evaluate_continuous_single(
 
     Returns
     -------
-    A list of event rows, one row per step t >= 1.
+    List of event rows, one row per transition t >= 1.
     """
     model.eval()
 
-    # fresh world
     env.resample_observations(generator)
 
     walk = generate_random_walk(
@@ -82,9 +84,9 @@ def evaluate_continuous_single(
         generator=generator,
     )
 
-    pos = walk["position"]   # [1, T]
-    act = walk["action"]     # [1, T]
-    vis = walk["visited"]    # [1, T]
+    pos = walk["position"]
+    act = walk["action"]
+    vis = walk["visited"]
     obs = env.get_observation_ids(pos)
 
     x = F.one_hot(obs, env.num_observations).float().to(device)
@@ -94,15 +96,16 @@ def evaluate_continuous_single(
     with torch.no_grad():
         output = model(x=x, a=a, visited=v)
 
-    pred_ids = output.x_gt[0].argmax(dim=-1).cpu()   # [T]
+    pred_ids = output.x_gt[0].argmax(dim=-1).cpu()
     true_obs = obs[0].cpu()
     pos_seq = pos[0].cpu()
     act_seq = act[0].cpu()
 
-    seen_edges: Set[Tuple[int, int, int]] = set()
-    visited_states: Set[int] = set()
+    state_visit_counts: Dict[int, int] = {}
+    edge_visit_counts: Dict[Tuple[int, int, int], int] = {}
 
-    visited_states.add(int(pos_seq[0].item()))
+    initial_state = int(pos_seq[0].item())
+    state_visit_counts[initial_state] = 1
 
     rows: List[Dict[str, int | float]] = []
 
@@ -113,15 +116,28 @@ def evaluate_continuous_single(
 
         edge = (s_prev, a_t, s_cur)
 
-        edge_seen_before = edge in seen_edges
-        first_time_edge = not edge_seen_before
-        target_seen_before = s_cur in visited_states
+        source_visit_count_before_t = state_visit_counts.get(s_prev, 0)
+        target_visit_count_before_t = state_visit_counts.get(s_cur, 0)
+        current_target_visit_index = target_visit_count_before_t + 1
 
-        # This is the paper-relevant event type:
-        # the link itself is new, but the target node has already been visited
-        inferable_unseen_link = first_time_edge and target_seen_before
+        edge_visit_count_before_t = edge_visit_counts.get(edge, 0)
+        current_edge_visit_index = edge_visit_count_before_t + 1
 
-        correct = int(pred_ids[t].item()) == int(true_obs[t].item())
+        edge_seen_before_t = edge_visit_count_before_t > 0
+        first_time_edge = edge_visit_count_before_t == 0
+        target_seen_before_t = target_visit_count_before_t > 0
+
+        inferable_unseen_link = first_time_edge and target_seen_before_t
+
+        nodes_visited_count_before_t = len(state_visit_counts)
+        nodes_visited_fraction_before_t = (
+            nodes_visited_count_before_t / env.num_states
+        )
+        unique_edges_seen_count_before_t = len(edge_visit_counts)
+
+        pred_obs_id = int(pred_ids[t].item())
+        true_obs_id = int(true_obs[t].item())
+        correct = int(pred_obs_id == true_obs_id)
 
         row = {
             "checkpoint_step": int(checkpoint_step or -1),
@@ -130,24 +146,94 @@ def evaluate_continuous_single(
             "state_prev": s_prev,
             "action_id": a_t,
             "state_cur": s_cur,
-            "edge_seen_before_t": int(edge_seen_before),
+            "source_visit_count_before_t": source_visit_count_before_t,
+            "target_visit_count_before_t": target_visit_count_before_t,
+            "current_target_visit_index": current_target_visit_index,
+            "edge_visit_count_before_t": edge_visit_count_before_t,
+            "current_edge_visit_index": current_edge_visit_index,
+            "edge_seen_before_t": int(edge_seen_before_t),
             "first_time_edge": int(first_time_edge),
-            "target_seen_before_t": int(target_seen_before),
+            "target_seen_before_t": int(target_seen_before_t),
             "inferable_unseen_link": int(inferable_unseen_link),
-            "nodes_visited_count_before_t": int(len(visited_states)),
-            "nodes_visited_fraction_before_t": float(len(visited_states) / env.num_states),
-            "unique_edges_seen_count_before_t": int(len(seen_edges)),
-            "pred_obs_id": int(pred_ids[t].item()),
-            "true_obs_id": int(true_obs[t].item()),
-            "correct": int(correct),
+            "nodes_visited_count_before_t": nodes_visited_count_before_t,
+            "nodes_visited_fraction_before_t": nodes_visited_fraction_before_t,
+            "unique_edges_seen_count_before_t": unique_edges_seen_count_before_t,
+            "pred_obs_id": pred_obs_id,
+            "true_obs_id": true_obs_id,
+            "correct": correct,
         }
         rows.append(row)
 
-        # update AFTER logging the current event
-        seen_edges.add(edge)
-        visited_states.add(s_cur)
+        edge_visit_counts[edge] = edge_visit_count_before_t + 1
+        state_visit_counts[s_cur] = target_visit_count_before_t + 1
 
     return rows
+
+
+def evaluate_continuous(
+    model: torch.nn.Module,
+    env: GraphEnvironment,
+    walk_len: int,
+    num_episodes: int,
+    device: torch.device,
+    generator: Optional[torch.Generator] = None,
+    checkpoint_step: Optional[int] = None,
+) -> Dict[str, object]:
+    """
+    Generic continuous-walk zero-shot evaluation for any graph environment.
+
+    Used by family_tree and spatial_graph experiments.
+
+    Returns a dict with:
+        overall_unseen_accuracy, overall_unseen_correct, overall_unseen_total,
+        overall_seen_accuracy, overall_seen_correct, overall_seen_total,
+        bins (list of per-checkpoint bin dicts).
+    """
+    rows = collect_evaluation_events(
+        model=model,
+        env=env,
+        walk_len=walk_len,
+        num_episodes=num_episodes,
+        device=device,
+        generator=generator,
+        checkpoint_step=checkpoint_step,
+    )
+
+    summary = summarize_events(rows)
+
+    # Build per-step bins for backward compatibility
+    inferable = [r for r in rows if int(r["inferable_unseen_link"]) == 1]
+
+    bin_data: Dict[int, Dict[str, List[int]]] = {}
+    for r in inferable:
+        key = int(r["target_visit_count_before_t"])
+        if key not in bin_data:
+            bin_data[key] = {"correct": [], "total": []}
+        bin_data[key]["correct"].append(int(r["correct"]))
+        bin_data[key]["total"].append(1)
+
+    bins: List[Dict] = []
+    for key in sorted(bin_data.keys()):
+        c = sum(bin_data[key]["correct"])
+        t = len(bin_data[key]["total"])
+        bins.append(
+            {
+                "target_visit_count_before_t": key,
+                "correct": c,
+                "total": t,
+                "accuracy": c / max(t, 1),
+            }
+        )
+
+    return {
+        "overall_unseen_accuracy": summary["inferable_unseen_accuracy"],
+        "overall_unseen_correct": summary["inferable_unseen_correct"],
+        "overall_unseen_total": summary["inferable_unseen_total"],
+        "overall_seen_accuracy": summary["seen_accuracy"],
+        "overall_seen_correct": summary["seen_correct"],
+        "overall_seen_total": summary["seen_total"],
+        "bins": bins,
+    }
 
 
 def collect_evaluation_events(

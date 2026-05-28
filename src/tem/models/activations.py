@@ -19,28 +19,33 @@ def phi_g(x: torch.Tensor) -> torch.Tensor :
     """
     Grid-state activation.
 
-    Formula:
-        phi_g(x) = clip(tanh(x), -1, 1)
+    Matches the original TEM paper (Whittington et al.):
+        f_g_freq(g, _) = tf.minimum(tf.maximum(g, -1), 1)
+
+    This is a hard clip to [-1, 1] with no tanh.
 
     Shape:
         input:  any shape
         output: same shape
     """
-    return torch.clamp(torch.tanh(x), min=-1.0, max=1.0)
+    return torch.clamp(x, min=-1.0, max=1.0)
 
 
 def phi_p(x: torch.Tensor) -> torch.Tensor :
     """
     Place-state activation.
 
-    Formula:
-        phi_p(x) = clip(leaky_relu(x), -1, 1)
+    Matches the original TEM paper (Whittington et al.):
+        f_p_freq(p, _) = tf.nn.leaky_relu(tf.minimum(tf.maximum(p, -1), 1))
+
+    This is clamp first, then leaky_relu (with alpha=0.01, PyTorch default).
 
     Shape:
         input:  any shape
         output: same shape
     """
-    return torch.clamp(F.leaky_relu(x), min=-1.0, max=1.0)
+    x = torch.clamp(x, min=-1.0, max=1.0)
+    return F.leaky_relu(x)
 
 
 def positive_softplus(x: torch.Tensor) -> torch.Tensor:

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import torch
+from tqdm import tqdm
 
 from tem.config import TEMConfig
 from tem.losses import compute_tem_loss
@@ -86,7 +87,7 @@ def run_spatial_graph(
     )
     t0 = time.time()
 
-    for step in range(1, num_steps + 1):
+    for step in tqdm(range(1, num_steps + 1), desc="Spatial Graph", unit="step"):
         model.train()
         env.resample_observations(gen)
 

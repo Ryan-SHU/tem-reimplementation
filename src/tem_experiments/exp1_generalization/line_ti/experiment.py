@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import torch
+from tqdm import tqdm
 
 from tem.config import TEMConfig
 from tem.losses import compute_tem_loss
@@ -105,7 +106,7 @@ def run_line_ti_train(
 
     t0 = time.time()
 
-    for step in range(1, num_steps + 1):
+    for step in tqdm(range(1, num_steps + 1), desc="Training", unit="step"):
         model.train()
 
         # new world each step

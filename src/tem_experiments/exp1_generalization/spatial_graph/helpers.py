@@ -1,8 +1,9 @@
-"""Helpers for Spatial Graph experiment. Re-uses generic zero-shot evaluation."""
+"""Helpers for Spatial Graph experiment. Re-uses generic continuous-walk evaluation."""
 
 from tem_experiments.exp1_generalization.line_ti.helpers import (
-    evaluate_zero_shot,
-    evaluate_zero_shot_single,
+    evaluate_continuous,
+    collect_evaluation_events,
+    summarize_events,
 )
 
-__all__ = ["evaluate_zero_shot", "evaluate_zero_shot_single"]
+__all__ = ["evaluate_continuous", "collect_evaluation_events", "summarize_events"]

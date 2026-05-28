@@ -11,6 +11,7 @@ checkpoints/
 *.pt
 *.pth
 projectLog.md
+docs/
 src/tem_reimplementation.egg-info/
 # Python packaging metadata
 *.egg-info/

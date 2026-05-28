@@ -167,8 +167,10 @@ phi_g(z): same shape
 Definition:
 
 ```text
-phi_g(z) = clamp(tanh(z), min=-1, max=1)
+phi_g(z) = clamp(z, min=-1, max=1)
 ```
+
+Matches original paper: `tf.minimum(tf.maximum(g, -1), 1)` (no tanh).
 
 ---
 
@@ -189,8 +191,11 @@ phi_p(z): same shape
 Definition:
 
 ```text
-phi_p(z) = clamp(leaky_relu(z), min=-1, max=1)
+phi_p(z) = leaky_relu(clamp(z, min=-1, max=1))
 ```
+
+Matches original paper: `tf.nn.leaky_relu(tf.minimum(tf.maximum(p, -1), 1))`.
+Note: clamp is applied FIRST, then leaky_relu.
 
 ---
 
